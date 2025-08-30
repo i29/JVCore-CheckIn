@@ -1581,7 +1581,7 @@
                             
                             // 重新初始化合约
                             if (AppState.userAccount) {
-                                await ContractManager.initializeContracts();
+                                await ContractManager.initialize();
                                 await MemberManager.checkMembership();
                                 UIManager.showStatus('网络切换完成', 'success');
                             }
@@ -1596,7 +1596,7 @@
                             } else {
                                 // 网络正确，重新初始化合约
                                 if (AppState.userAccount) {
-                                    await ContractManager.initializeContracts();
+                                    await ContractManager.initialize();
                                     await MemberManager.checkMembership();
                                 }
                             }
