@@ -455,6 +455,17 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
+        
+        #statusMessage {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            max-width: 500px;
+            width: 90%;
+            margin: 0;
+        }
 
         .status.success {
             background: rgba(0, 255, 0, 0.1);
@@ -667,10 +678,10 @@
 
         </div>
         
-        <button class="btn btn-checkin" id="checkinBtn" onclick="CheckInManager.performCheckIn()" style="display: none;">🎯 立即签到</button>
-        
-        <div class="status hidden" id="statusMessage"></div>
+        <button class="btn btn-checkin hidden" id="checkinBtn" onclick="CheckInManager.performCheckIn()">🎯 立即签到</button>
     </div>
+    
+    <div class="status hidden" id="statusMessage"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
     <script>
@@ -1388,7 +1399,7 @@
                         window.hasCheckedInThisMonth = true;
                         // 隐藏签到按钮
                         if (checkinBtn) {
-                            checkinBtn.style.display = 'none';
+                            checkinBtn.classList.add('hidden');
                         }
                     } else {
                         checkInStatusEl.textContent = '❌ 本月未签到';
@@ -1396,7 +1407,7 @@
                         window.hasCheckedInThisMonth = false;
                         // 显示签到按钮
                         if (checkinBtn) {
-                            checkinBtn.style.display = 'inline-block';
+                            checkinBtn.classList.remove('hidden');
                         }
                     }
                     
@@ -1410,7 +1421,7 @@
                     window.hasCheckedInThisMonth = false;
                     // 显示签到按钮
                     if (checkinBtn) {
-                        checkinBtn.style.display = 'inline-block';
+                        checkinBtn.classList.remove('hidden');
                     }
                 }
             }
@@ -1525,9 +1536,57 @@
             });
             
             // 监听网络变化事件
+            let chainChangeTimeout;
             window.ethereum.on('chainChanged', function (chainId) {
-                // 网络变化时重新加载页面
-                window.location.reload();
+                console.log('网络变化检测到:', chainId);
+                
+                // 清除之前的定时器，防止频繁触发
+                if (chainChangeTimeout) {
+                    clearTimeout(chainChangeTimeout);
+                }
+                
+                // 添加防抖机制，延迟处理网络变化
+                chainChangeTimeout = setTimeout(async () => {
+                    try {
+                        // 检查是否在欧易客户端中
+                        const isOKXApp = /OKApp/i.test(navigator.userAgent) || window.okxwallet;
+                        
+                        if (isOKXApp) {
+                            // 在欧易客户端中，不重新加载页面，而是重新初始化合约
+                            console.log('检测到欧易客户端，重新初始化合约而非重载页面');
+                            UIManager.showStatus('网络已切换，正在重新连接...', 'info');
+                            
+                            // 清除当前状态
+                            AppState.contracts = {};
+                            UIManager.clearMemberInfo();
+                            
+                            // 重新初始化合约
+                            if (AppState.userAccount) {
+                                await ContractManager.initializeContracts();
+                                await MemberManager.checkMembership();
+                                UIManager.showStatus('网络切换完成', 'success');
+                            }
+                        } else {
+                            // 在其他环境中，检查网络是否正确
+                            const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
+                            const targetChainId = '0x38'; // BSC主网
+                            
+                            if (currentChainId !== targetChainId) {
+                                // 只有在网络不匹配时才提示切换
+                                UIManager.showStatus('请切换到BSC主网', 'error');
+                            } else {
+                                // 网络正确，重新初始化合约
+                                if (AppState.userAccount) {
+                                    await ContractManager.initializeContracts();
+                                    await MemberManager.checkMembership();
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('处理网络变化失败:', error);
+                        UIManager.showStatus('网络切换处理失败: ' + error.message, 'error');
+                    }
+                }, 1000); // 1秒防抖延迟
             });
         }
         
