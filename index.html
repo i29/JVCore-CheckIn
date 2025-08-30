@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>J-Checkin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Rajdhani', 'Orbitron', 'Courier New', monospace;
+            background: radial-gradient(ellipse at center, #0a0a0a 0%, #1a0033 50%, #000000 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+            position: relative;
+            font-weight: 400;
+            letter-spacing: 0.5px;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 25% 25%, rgba(0, 255, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(255, 0, 255, 0.06) 0%, transparent 50%);
+            background-size: 80px 80px, 120px 120px;
+            animation: gridMove 40s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 255, 255, 0.04) 2px,
+                    rgba(0, 255, 255, 0.04) 4px
+                );
+            pointer-events: none;
+            z-index: 1;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% {
+                background-position: 0 0, 0 0;
+            }
+            100% {
+                background-position: 40px 40px, -40px -40px;
+            }
+        }
+        
+        @keyframes scanlines {
+            0% { transform: translateY(-100%); opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(100vh); opacity: 0.3; }
+        }
+
+        .container {
+            background: rgba(0, 20, 40, 0.8);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 
+                0 0 50px rgba(0, 255, 255, 0.3),
+                inset 0 0 50px rgba(0, 255, 255, 0.1),
+                0 0 100px rgba(255, 0, 255, 0.2);
+            border: 2px solid;
+            border-image: linear-gradient(45deg, #00ffff, #ff00ff, #00ff00, #ffff00) 1;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+            animation: fadeInUp 0.8s ease-out;
+            position: relative;
+            z-index: 2;
+            overflow: hidden;
+        }
+
+        /* .container::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            animation: scanline 2s linear infinite;
+            z-index: 1;
+        } */
+        
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                repeating-linear-gradient(
+                    45deg,
+                    transparent,
+                    transparent 3px,
+                    rgba(0, 255, 255, 0.015) 3px,
+                    rgba(0, 255, 255, 0.015) 6px
+                );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes containerGlow {
+            0% {
+                box-shadow: 
+                    0 0 30px rgba(0, 255, 255, 0.3),
+                    inset 0 0 30px rgba(0, 255, 255, 0.1),
+                    0 0 60px rgba(255, 0, 255, 0.2);
+            }
+            100% {
+                box-shadow: 
+                    0 0 60px rgba(0, 255, 255, 0.5),
+                    inset 0 0 60px rgba(0, 255, 255, 0.2),
+                    0 0 120px rgba(255, 0, 255, 0.4);
+            }
+        }
+
+        @keyframes scanline {
+            0% {
+                top: -2px;
+            }
+            100% {
+                top: 100%;
+            }
+        }
+
+        @keyframes glitch {
+            0%, 100% {
+                transform: translate(0);
+            }
+            20% {
+                transform: translate(-2px, 2px);
+            }
+            40% {
+                transform: translate(-2px, -2px);
+            }
+            60% {
+                transform: translate(2px, 2px);
+            }
+            80% {
+                transform: translate(2px, -2px);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+        
+        @keyframes containerPattern {
+            0% {
+                background-position: 0 0, 0 0;
+            }
+            100% {
+                background-position: 20px 20px, -20px -20px;
+            }
+        }
+        
+        @keyframes dataStream {
+            0% {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(100vw);
+                opacity: 0;
+            }
+        }
+
+        @keyframes dataFlicker {
+            0%, 100% {
+                opacity: 1;
+                text-shadow: 0 0 5px currentColor;
+            }
+            25% {
+                opacity: 0.8;
+                text-shadow: 0 0 10px currentColor;
+            }
+            50% {
+                opacity: 0.9;
+                text-shadow: 0 0 15px currentColor;
+            }
+            75% {
+                opacity: 0.7;
+                text-shadow: 0 0 8px currentColor;
+            }
+        }
+
+        @keyframes loading {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading {
+            position: relative;
+            pointer-events: none;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20px;
+            height: 20px;
+            margin: -10px 0 0 -10px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: loading 1s linear infinite;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-shadow: 
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 30px #00ffff,
+                0 0 40px #00ffff;
+            animation: logoGlow 2s ease-in-out infinite alternate;
+            font-family: 'Orbitron', monospace;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            position: relative;
+        }
+        
+        .logo::before {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            color: #ff0080;
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        @keyframes logoGlow {
+            0% {
+                text-shadow: 
+                    0 0 10px #00ffff,
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff,
+                    0 0 40px #00ffff;
+            }
+            100% {
+                text-shadow: 
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff,
+                    0 0 40px #00ffff,
+                    0 0 50px #00ffff,
+                    0 0 60px #00ffff;
+            }
+        }
+
+        .subtitle {
+            color: #00ff88;
+            margin-bottom: 30px;
+            font-size: 1.4rem;
+            text-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+            font-family: 'Exo 2', sans-serif;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            opacity: 0.9;
+        }
+
+        .wallet-section {
+            margin-bottom: 30px;
+        }
+
+        .wallet-address {
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid #00ffff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            color: #00ffff;
+            font-family: 'Exo 2', monospace;
+            font-weight: 500;
+            letter-spacing: 1px;
+            word-break: break-all;
+            display: none;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #001122, #003344);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            padding: 14px 28px;
+            color: #00ffff;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(0, 255, 255, 0.1);
+            font-family: 'Rajdhani', sans-serif;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.4), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-connect {
+            border-color: #00ff00;
+            color: #00ff00;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.3),
+                inset 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        .btn-connect:hover {
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .btn-connect::before {
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 0, 0.4), transparent);
+        }
+
+        .btn-disconnect {
+            border-color: #ff0040;
+            color: #ff0040;
+            box-shadow: 
+                0 0 20px rgba(255, 0, 64, 0.3),
+                inset 0 0 20px rgba(255, 0, 64, 0.1);
+            display: none;
+        }
+
+        .btn-disconnect:hover {
+            box-shadow: 0 0 20px rgba(255, 0, 64, 0.5);
+            text-shadow: 0 0 5px #ff0040;
+        }
+
+        .btn-disconnect::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 0, 64, 0.4), transparent);
+        }
+
+        .btn-checkin {
+            border-color: #ffff00;
+            color: #ffff00;
+            font-size: 1.3rem;
+            padding: 20px 40px;
+            display: none;
+            box-shadow: 
+                0 0 20px rgba(255, 255, 0, 0.3),
+                inset 0 0 20px rgba(255, 255, 0, 0.1);
+        }
+
+        .btn-checkin:hover {
+            box-shadow: 0 0 20px rgba(255, 255, 0, 0.5);
+            text-shadow: 0 0 5px #ffff00;
+        }
+
+        .btn-checkin::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 0, 0.4), transparent);
+        }
+
+
+
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-family: 'Orbitron', monospace;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status.success {
+            background: rgba(0, 255, 0, 0.1);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 0, 0.3),
+                inset 0 0 15px rgba(0, 255, 0, 0.1);
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .status.error {
+            background: rgba(255, 0, 64, 0.1);
+            color: #ff0040;
+            border: 1px solid #ff0040;
+            box-shadow: 
+                0 0 15px rgba(255, 0, 64, 0.3),
+                inset 0 0 15px rgba(255, 0, 64, 0.1);
+            text-shadow: 0 0 10px #ff0040;
+        }
+
+        .status.info {
+            background: rgba(0, 255, 255, 0.1);
+            color: #00ffff;
+            border: 1px solid #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .member-info {
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid #ff00ff;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 25px 0;
+            color: #ff00ff;
+            display: none;
+            box-shadow: 
+                0 0 15px rgba(255, 0, 255, 0.3),
+                inset 0 0 15px rgba(255, 0, 255, 0.1);
+            text-shadow: 0 0 5px #ff00ff;
+            font-family: 'Rajdhani', sans-serif;
+            /* animation: dataFlicker 3s ease-in-out infinite; */
+        }
+        
+        .member-info h3 {
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #00ff88;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .member-info p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+
+        .wallet-address {
+            /* animation: dataFlicker 4s ease-in-out infinite; */
+        }
+
+        .status {
+            /* animation: dataFlicker 2s ease-in-out infinite; */
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .particles {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: #00ffff;
+            border-radius: 50%;
+            animation: float 8s infinite linear;
+            box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+        }
+        
+        .particle:nth-child(2n) {
+            background: #ff0080;
+            animation-duration: 12s;
+            width: 2px;
+            height: 2px;
+        }
+        
+        .particle:nth-child(3n) {
+            background: #00ff88;
+            animation-duration: 10s;
+            width: 4px;
+            height: 4px;
+        }
+        
+        .particle:nth-child(4n) {
+            background: #ffff00;
+            animation-duration: 15s;
+            width: 1px;
+            height: 1px;
+        }
+        
+        .particle:nth-child(5n) {
+            background: #ffffff;
+            animation-duration: 6s;
+            width: 2px;
+            height: 2px;
+            box-shadow: 0 0 5px currentColor;
+        }
+        
+        .data-streams {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .data-stream {
+            position: absolute;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #00ffff, #ff0080, transparent);
+            animation: dataStream 8s linear infinite;
+            opacity: 0.6;
+        }
+        
+        .data-stream:nth-child(2n) {
+            background: linear-gradient(90deg, transparent, #00ff88, #ffff00, transparent);
+            animation-duration: 12s;
+        }
+        
+        .data-stream:nth-child(3n) {
+            background: linear-gradient(90deg, transparent, #ff0080, #00ffff, transparent);
+            animation-duration: 10s;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) rotate(360deg);
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+    <div class="data-streams" id="dataStreams"></div>
+    
+    <div class="container">
+        <div class="logo" data-text="🗳️ JVCore">🗳️ JVCore</div>
+        <div class="subtitle">区块链签到系统</div>
+        
+
+        
+        <div class="wallet-section">
+            <button class="btn btn-connect" id="connectBtn" onclick="connectWallet()">连接钱包</button>
+            <button class="btn btn-disconnect" id="disconnectBtn" onclick="disconnectWallet()">断开连接</button>
+            <div class="wallet-address" id="walletAddress"></div>
+        </div>
+        
+        <div class="member-info" id="memberInfo">
+            <div>成员状态: <span id="memberStatus">检查中...</span></div>
+            <!-- <div>持有数量: <span id="memberCount">0</span></div> -->
+            <div id="memberNumbers" style="display: none; margin-top: 10px;">
+                <div style="color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">成员编号: <span id="memberNumbersList"></span></div>
+            </div>
+            <div id="lastCheckInInfo" style="display: none; margin-top: 10px;">
+                <div style="color: rgba(255, 255, 255, 0.9); font-size: 0.9rem;">最后签到: <span id="lastCheckInTime">未签到</span></div>
+                <div id="checkInStatus" style="color: #00ff88; font-size: 0.8rem; margin-top: 5px;"></div>
+            </div>
+            <div id="nonMemberTip" style="display: none; margin-top: 10px; padding: 10px; background: rgba(255, 193, 7, 0.1); border-radius: 8px; border-left: 4px solid #ffc107;">
+                <div style="color: #ffc107; font-size: 0.9rem;">💡 您还不是成员</div>
+                <div style="color: rgba(255, 255, 255, 0.8); font-size: 0.8rem; margin-top: 5px;">成为成员后可享受更多权益和功能</div>
+            </div>
+
+        </div>
+        
+        <button class="btn btn-checkin" id="checkinBtn" onclick="CheckInManager.performCheckIn()" style="display: none;">🎯 立即签到</button>
+        
+        <div class="status hidden" id="statusMessage"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.0/dist/web3.min.js"></script>
+    <script>
+        // JVCore 合约 ABI (包含签到和NFT功能)
+        const JVCORE_ABI = [
+            // 签到相关功能
+            {
+                "inputs": [],
+                "name": "checkIn",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "user",
+                        "type": "address"
+                    }
+                ],
+                "name": "getCheckInCount",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "user",
+                        "type": "address"
+                    }
+                ],
+                "name": "getLastCheckInTime",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "user",
+                        "type": "address"
+                    }
+                ],
+                "name": "canCheckInToday",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "anonymous": false,
+                "inputs": [
+                    {
+                        "indexed": true,
+                        "internalType": "address",
+                        "name": "user",
+                        "type": "address"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    },
+                    {
+                        "indexed": false,
+                        "internalType": "uint256",
+                        "name": "totalCount",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "CheckInEvent",
+                "type": "event"
+            },
+            // NFT相关功能
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    }
+                ],
+                "name": "balanceOf",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "address",
+                        "name": "owner",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "index",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "tokenOfOwnerByIndex",
+                "outputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "",
+                        "type": "uint256"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "tokenId",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "tokenURI",
+                "outputs": [
+                    {
+                        "internalType": "string",
+                        "name": "",
+                        "type": "string"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "tokenId",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "ownerOf",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            }
+        ];
+
+        /**
+         * 应用状态管理器
+         * 统一管理Web3实例、用户账户和智能合约实例
+         */
+        const AppState = {
+            web3: null,              // Web3实例
+            userAccount: null,       // 当前连接的用户账户地址
+            contracts: {
+                jvcore: null         // JVCore合约实例（包含签到和NFT功能）
+            },
+            
+            // 重置所有状态
+            reset() {
+                this.web3 = null;
+                this.userAccount = null;
+                this.contracts.jvcore = null;
+            },
+            
+            // 检查是否已连接钱包
+            isConnected() {
+                return this.web3 && this.userAccount;
+            },
+            
+            // 检查合约是否已初始化
+            areContractsReady() {
+                return this.contracts.jvcore;
+            }
+        };
+        
+        /**
+         * 配置管理器
+         * 集中管理合约地址和网络配置
+         */
+        const CONFIG = {
+            contracts: {
+                jvcore: '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392'    // JVCore合约地址（包含签到和NFT功能）
+            },
+            network: {
+                chainId: '0xe52',                                        // JNS DAO网络链ID (3666)
+                chainName: 'JNS DAO Network',
+                nativeCurrency: {
+                    name: 'J',
+                    symbol: 'J',
+                    decimals: 18
+                },
+                rpcUrls: ['https://rpc.jnsdao.com:8503'],
+                blockExplorerUrls: ['https://jscan.jnsdao.com']
+            }
+        };
+        
+        /**
+         * 工具函数集合
+         * 提供通用的辅助功能
+         */
+        const Utils = {
+            /**
+             * 验证以太坊地址格式
+             * @param {string} address - 待验证的地址
+             * @returns {boolean} 是否为有效的以太坊地址
+             */
+            isValidEthereumAddress(address) {
+                if (!address || address === '') return false;
+                return /^0x[a-fA-F0-9]{40}$/.test(address);
+            },
+            
+            /**
+             * 格式化时间戳为可读格式
+             * @param {number} timestamp - Unix时间戳
+             * @returns {string} 格式化后的时间字符串
+             */
+            formatTimestamp(timestamp) {
+                if (!timestamp || timestamp === 0) return '未签到';
+                const date = new Date(timestamp * 1000);
+                return date.toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            },
+            
+            /**
+             * 检查时间戳是否为当前月份
+             * @param {number} timestamp - Unix时间戳
+             * @returns {boolean} 是否为当前月份
+             */
+            isCurrentMonth(timestamp) {
+                if (!timestamp || timestamp === 0) return false;
+                const checkInDate = new Date(timestamp * 1000);
+                const now = new Date();
+                return checkInDate.getFullYear() === now.getFullYear() && 
+                       checkInDate.getMonth() === now.getMonth();
+            },
+            
+            /**
+             * 解析Token元数据
+             * 支持Base64编码的JSON、直接JSON和HTTP URL格式
+             * @param {string} tokenURI - Token的URI
+             * @returns {Object|null} 解析后的元数据对象，失败时返回null
+             */
+            parseTokenMetadata(tokenURI) {
+                try {
+                    if (!tokenURI) return null;
+                    
+                    // 处理Base64编码的JSON (data:application/json;base64,xxx)
+                    if (tokenURI.startsWith('data:application/json;base64,')) {
+                        const base64Data = tokenURI.split(',')[1];
+                        const jsonString = atob(base64Data);
+                        return JSON.parse(jsonString);
+                    }
+                    
+                    // 处理直接的JSON字符串
+                    if (tokenURI.startsWith('{')) {
+                        return JSON.parse(tokenURI);
+                    }
+                    
+                    // 处理HTTP URL (需要通过代理或CORS处理)
+                    if (tokenURI.startsWith('http')) {
+                        console.warn('HTTP URL需要异步处理:', tokenURI);
+                        return { name: 'Loading...', description: 'Fetching metadata...' };
+                    }
+                    
+                    return null;
+                } catch (error) {
+                    console.error('解析Token元数据失败:', error);
+                    return null;
+                }
+            }
+        };
+        
+        /**
+         * 智能合约管理器
+         * 负责初始化和管理所有智能合约实例
+         */
+        const ContractManager = {
+            /**
+             * 初始化所有合约实例
+             * @throws {Error} 当合约初始化失败时抛出错误
+             */
+            initialize() {
+                try {
+                    this.initializeJVCoreContract();
+                    console.log('合约初始化完成');
+                } catch (error) {
+                    console.error('合约初始化失败:', error);
+                    throw error;
+                }
+            },
+            
+            /**
+             * 初始化JVCore合约（包含签到和NFT功能）
+             * @throws {Error} 当合约地址无效时抛出错误
+             */
+            initializeJVCoreContract() {
+                if (!Utils.isValidEthereumAddress(CONFIG.contracts.jvcore)) {
+                    throw new Error('JVCore合约地址无效');
+                }
+                AppState.contracts.jvcore = new AppState.web3.eth.Contract(JVCORE_ABI, CONFIG.contracts.jvcore);
+            }
+        };
+        
+        // 初始化粒子效果（优化版本 - 减少粒子数量）
+        function createParticles() {
+            const particlesContainer = document.getElementById('particles');
+            for (let i = 0; i < 15; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 8 + 's';
+                particle.style.animationDuration = (Math.random() * 4 + 6) + 's';
+                particlesContainer.appendChild(particle);
+            }
+        }
+        
+        function createDataStreams() {
+            const dataStreamsContainer = document.getElementById('dataStreams');
+            for (let i = 0; i < 4; i++) {
+                const stream = document.createElement('div');
+                stream.className = 'data-stream';
+                stream.style.left = Math.random() * 100 + '%';
+                stream.style.animationDelay = Math.random() * 6 + 's';
+                stream.style.animationDuration = (Math.random() * 3 + 5) + 's';
+                
+                // 简化渐变颜色选择
+                const gradients = [
+                    'linear-gradient(180deg, transparent, #00ffff, transparent)',
+                    'linear-gradient(180deg, transparent, #ff00ff, transparent)'
+                ];
+                stream.style.background = gradients[Math.floor(Math.random() * gradients.length)];
+                
+                dataStreamsContainer.appendChild(stream);
+            }
+        }
+        
+        /**
+         * 用户界面管理器
+         * 负责所有UI元素的更新和状态管理
+         */
+        const UIManager = {
+            /**
+             * 显示状态消息
+             * @param {string} message - 要显示的消息内容
+             * @param {string} type - 消息类型 ('info'|'success'|'error')
+             */
+            showStatus(message, type = 'info') {
+                const statusEl = document.getElementById('statusMessage');
+                
+                // 添加淡入动画
+                statusEl.style.opacity = '0';
+                statusEl.style.transform = 'translateY(-10px)';
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+                statusEl.classList.remove('hidden');
+                
+                // 触发淡入动画
+                requestAnimationFrame(() => {
+                    statusEl.style.transition = 'all 0.3s ease-out';
+                    statusEl.style.opacity = '1';
+                    statusEl.style.transform = 'translateY(0)';
+                });
+                
+                // 根据消息类型添加特殊效果
+                if (type === 'success') {
+                    statusEl.style.animation = 'pulse 0.6s ease-in-out';
+                } else if (type === 'error') {
+                    statusEl.style.animation = 'glitch 0.5s ease-in-out';
+                }
+                
+                // 5秒后自动隐藏消息
+                setTimeout(() => {
+                    statusEl.style.transition = 'all 0.3s ease-in';
+                    statusEl.style.opacity = '0';
+                    statusEl.style.transform = 'translateY(-10px)';
+                    
+                    setTimeout(() => {
+                        statusEl.classList.add('hidden');
+                        statusEl.style.animation = '';
+                    }, 300);
+                }, 5000);
+            },
+            
+            /**
+             * 更新钱包连接状态的UI显示
+             * @param {boolean} connected - 是否已连接钱包
+             */
+            updateWalletUI(connected) {
+                const connectBtn = document.getElementById('connectBtn');
+                const disconnectBtn = document.getElementById('disconnectBtn');
+                const walletAddress = document.getElementById('walletAddress');
+                const memberInfo = document.getElementById('memberInfo');
+                const checkinBtn = document.getElementById('checkinBtn');
+                
+                if (connected) {
+                    // 显示已连接状态的UI元素
+                    connectBtn.style.display = 'none';
+                    disconnectBtn.style.display = 'inline-block';
+                    walletAddress.style.display = 'block';
+                    walletAddress.textContent = `钱包地址: ${AppState.userAccount}`;
+                    memberInfo.style.display = 'block';
+                    checkinBtn.style.display = 'inline-block';
+                } else {
+                    // 显示未连接状态的UI元素
+                    connectBtn.style.display = 'inline-block';
+                    disconnectBtn.style.display = 'none';
+                    walletAddress.style.display = 'none';
+                    memberInfo.style.display = 'none';
+                    checkinBtn.style.display = 'none';
+                    this.clearMemberInfo();
+                }
+            },
+            
+            /**
+             * 清除成员信息显示
+             */
+            clearMemberInfo() {
+                document.getElementById('memberStatus').textContent = '检查中...';
+                document.getElementById('memberNumbers').style.display = 'none';
+                document.getElementById('lastCheckInInfo').style.display = 'none';
+            },
+            
+            /**
+             * 更新成员状态显示
+             * @param {boolean} isMember - 是否为成员
+             * @param {number} memberCount - 成员NFT数量
+             */
+            updateMemberStatus(isMember, memberCount = 0) {
+                const statusEl = document.getElementById('memberStatus');
+                const checkinBtn = document.getElementById('checkinBtn');
+                const nonMemberTip = document.getElementById('nonMemberTip');
+                
+                if (isMember) {
+                    // 显示成员状态
+                    statusEl.textContent = '✅';
+                    statusEl.style.color = '#00ff88';
+                    statusEl.style.fontWeight = 'bold';
+                    statusEl.style.textShadow = '0 0 10px rgba(0, 255, 136, 0.5)';
+                    checkinBtn.style.display = 'block';
+                    if (nonMemberTip) nonMemberTip.style.display = 'none';
+                } else {
+                    // 显示非成员状态
+                    statusEl.textContent = '❌ 非成员';
+                    statusEl.style.color = '#f44336';
+                    checkinBtn.style.display = 'none';
+                    document.getElementById('memberNumbers').style.display = 'none';
+                    if (nonMemberTip) nonMemberTip.style.display = 'block';
+                }
+            }
+        };
+        
+        /**
+         * 网络管理器
+         * 处理区块链网络相关操作
+         */
+        const NetworkManager = {
+            /**
+             * 切换到正确的区块链网络
+             * 如果网络不存在则自动添加
+             * @throws {Error} 当网络切换或添加失败时抛出错误
+             */
+            async switchToCorrectNetwork() {
+                try {
+                    // 尝试切换到目标网络
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: CONFIG.network.chainId }]
+                    });
+                    UIManager.showStatus('已切换到 JNS DAO 网络', 'success');
+                } catch (switchError) {
+                    // 如果网络不存在(错误码4902)，则添加网络
+                    if (switchError.code === 4902) {
+                        try {
+                            await window.ethereum.request({
+                                method: 'wallet_addEthereumChain',
+                                params: [CONFIG.network]
+                            });
+                            UIManager.showStatus('JNS DAO 网络添加成功！', 'success');
+                        } catch (addError) {
+                            console.error('添加网络失败:', addError);
+                            UIManager.showStatus('添加网络失败: ' + addError.message, 'error');
+                            throw addError;
+                        }
+                    } else {
+                        console.error('切换网络失败:', switchError);
+                        UIManager.showStatus('切换网络失败: ' + switchError.message, 'error');
+                        throw switchError;
+                    }
+                }
+            }
+        };
+
+        // 解析Token元数据
+
+        
+        /**
+         * 连接钱包函数
+         * 处理MetaMask钱包连接流程
+         */
+        async function connectWallet() {
+            const connectBtn = document.getElementById('connectBtn');
+            
+            // 检查是否安装了MetaMask
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    // 添加加载状态
+                    connectBtn.classList.add('loading');
+                    connectBtn.textContent = '连接中...';
+                    connectBtn.disabled = true;
+                    
+                    UIManager.showStatus('正在连接钱包...', 'info');
+                    
+                    // 请求用户授权访问账户
+                    const accounts = await window.ethereum.request({
+                        method: 'eth_requestAccounts'
+                    });
+                    
+                    // 保存用户账户和Web3实例
+                    AppState.userAccount = accounts[0];
+                    AppState.web3 = new Web3(window.ethereum);
+                    
+                    // 检查并切换到正确的区块链网络
+                    await NetworkManager.switchToCorrectNetwork();
+                    
+                    // 初始化智能合约实例
+                    ContractManager.initialize();
+                    
+                    // 更新用户界面
+                    UIManager.updateWalletUI(true);
+                    
+                    UIManager.showStatus('钱包连接成功！', 'success');
+                    
+                    // 检查用户成员状态
+                    await MemberManager.checkMembership();
+                    
+                } catch (error) {
+                    console.error('连接钱包失败:', error);
+                    UIManager.showStatus('连接钱包失败: ' + error.message, 'error');
+                } finally {
+                    // 恢复按钮状态
+                    connectBtn.classList.remove('loading');
+                    connectBtn.textContent = '连接钱包';
+                    connectBtn.disabled = false;
+                }
+            } else {
+                UIManager.showStatus('请安装 MetaMask 钱包！', 'error');
+            }
+        }
+        
+        /**
+         * 断开钱包连接函数
+         * 清除所有状态并更新UI
+         */
+        function disconnectWallet() {
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            
+            // 添加断开连接动画效果
+            disconnectBtn.style.animation = 'pulse 0.3s ease-in-out';
+            
+            AppState.reset();                    // 重置应用状态
+            UIManager.updateWalletUI(false);    // 更新UI为未连接状态
+            UIManager.showStatus('钱包已断开连接', 'info');
+            
+            // 重置按钮动画
+            setTimeout(() => {
+                disconnectBtn.style.animation = '';
+            }, 300);
+        }
+        
+        /**
+         * 成员管理器
+         * 处理成员资格验证和成员信息显示
+         */
+        const MemberManager = {
+            /**
+             * 检查用户的成员资格
+             * 验证用户是否持有成员NFT
+             */
+            async checkMembership() {
+                if (!AppState.userAccount) {
+                    UIManager.updateMemberStatus(false);
+                    document.getElementById('memberStatus').textContent = '请先连接钱包';
+                    return;
+                }
+                
+                if (!AppState.areContractsReady()) {
+                    document.getElementById('memberStatus').textContent = '合约未初始化';
+                    return;
+                }
+                
+                try {
+                    UIManager.clearMemberInfo();
+                    
+                    // 查询用户持有的NFT数量
+                    const balance = await AppState.contracts.jvcore.methods.balanceOf(AppState.userAccount).call();
+                    const isMember = balance > 0;
+                    
+                    UIManager.updateMemberStatus(isMember, balance);
+                    
+                    if (isMember) {
+                        await this.displayMemberNumbers();
+                    }
+                } catch (error) {
+                    console.error('检查成员资格失败:', error);
+                    document.getElementById('memberStatus').textContent = '检查失败';
+                    UIManager.showStatus('检查成员资格失败: ' + error.message, 'error');
+                }
+            },
+            
+            /**
+             * 显示成员编号和最后签到时间
+             * 遍历用户持有的所有NFT并显示相关信息
+             */
+            async displayMemberNumbers() {
+                try {
+                    const balance = await AppState.contracts.jvcore.methods.balanceOf(AppState.userAccount).call();
+                    const memberNumbers = [];
+                    let latestCheckInTime = 0;
+                    
+                    // 遍历用户持有的所有NFT
+                    for (let i = 0; i < balance; i++) {
+                        const tokenId = await AppState.contracts.jvcore.methods.tokenOfOwnerByIndex(AppState.userAccount, i).call();
+                        memberNumbers.push(tokenId);
+                        
+                        try {
+                             // 获取NFT元数据
+                             const tokenURI = await AppState.contracts.jvcore.methods.tokenURI(tokenId).call();
+                             const metadata = Utils.parseTokenMetadata(tokenURI);
+                            
+                            // 查找最新的签到时间
+                            if (metadata && metadata.lastCheckInTime) {
+                                const checkInTime = parseInt(metadata.lastCheckInTime);
+                                if (checkInTime > latestCheckInTime) {
+                                    latestCheckInTime = checkInTime;
+                                }
+                            }
+                        } catch (error) {
+                            console.error(`获取Token ${tokenId} URI失败:`, error);
+                        }
+                    }
+                    
+                    // 显示成员编号列表
+                    document.getElementById('memberNumbersList').textContent = memberNumbers.join(', ');
+                    document.getElementById('memberNumbers').style.display = 'block';
+                    
+                    // 显示最后签到时间信息
+                    this.displayLastCheckInTime(latestCheckInTime);
+                    
+                } catch (error) {
+                    console.error('获取成员编号失败:', error);
+                    UIManager.showStatus('获取成员信息失败: ' + error.message, 'error');
+                }
+            },
+            
+            /**
+             * 显示最后签到时间信息
+             * @param {number} latestCheckInTime - 最新签到时间戳
+             */
+            displayLastCheckInTime(latestCheckInTime) {
+                const lastCheckInInfoEl = document.getElementById('lastCheckInInfo');
+                const lastCheckInTimeEl = document.getElementById('lastCheckInTime');
+                const checkInStatusEl = document.getElementById('checkInStatus');
+                
+                const checkinBtn = document.getElementById('checkinBtn');
+                
+                if (latestCheckInTime && latestCheckInTime > 0) {
+                    // 格式化时间显示
+                    const formattedTime = Utils.formatTimestamp(latestCheckInTime);
+                    lastCheckInTimeEl.textContent = formattedTime;
+                    
+                    // 检查是否为本月签到
+                    const isThisMonth = Utils.isCurrentMonth(latestCheckInTime);
+                    if (isThisMonth) {
+                        checkInStatusEl.textContent = '✅ 本月已签到';
+                        checkInStatusEl.style.color = '#00ff88';
+                        window.hasCheckedInThisMonth = true;
+                        // 隐藏签到按钮
+                        if (checkinBtn) {
+                            checkinBtn.style.display = 'none';
+                        }
+                    } else {
+                        checkInStatusEl.textContent = '❌ 本月未签到';
+                        checkInStatusEl.style.color = '#f44336';
+                        window.hasCheckedInThisMonth = false;
+                        // 显示签到按钮
+                        if (checkinBtn) {
+                            checkinBtn.style.display = 'inline-block';
+                        }
+                    }
+                    
+                    lastCheckInInfoEl.style.display = 'block';
+                } else {
+                    // 没有签到记录
+                    lastCheckInTimeEl.textContent = '无记录';
+                    checkInStatusEl.textContent = '❌ 本月未签到';
+                    checkInStatusEl.style.color = '#f44336';
+                    lastCheckInInfoEl.style.display = 'block';
+                    window.hasCheckedInThisMonth = false;
+                    // 显示签到按钮
+                    if (checkinBtn) {
+                        checkinBtn.style.display = 'inline-block';
+                    }
+                }
+            }
+        };
+        
+        /**
+         * 签到管理器
+         * 处理用户签到相关操作
+         */
+        const CheckInManager = {
+            /**
+             * 执行签到操作
+             * 调用智能合约进行签到并处理结果
+             */
+            async performCheckIn() {
+                const checkinBtn = document.getElementById('checkinBtn');
+                
+                // 检查钱包连接状态
+                if (!AppState.userAccount) {
+                    UIManager.showStatus('请先连接钱包！', 'error');
+                    return;
+                }
+                
+                // 检查合约初始化状态
+                if (!AppState.areContractsReady()) {
+                    UIManager.showStatus('签到合约未初始化，请刷新页面重试', 'error');
+                    return;
+                }
+                
+                // 检查本月是否已签到
+                if (window.hasCheckedInThisMonth) {
+                    const confirmReCheckIn = confirm('您本月已经签到过了，是否要再次签到？');
+                    if (!confirmReCheckIn) {
+                        UIManager.showStatus('已取消签到', 'info');
+                        return;
+                    }
+                }
+                
+                try {
+                    // 添加加载状态
+                    checkinBtn.classList.add('loading');
+                    checkinBtn.textContent = '签到中...';
+                    checkinBtn.disabled = true;
+                    
+                    UIManager.showStatus('正在签到...', 'info');
+                    
+                    // 调用签到合约方法
+                    const result = await AppState.contracts.jvcore.methods.checkIn().send({
+                        from: AppState.userAccount,
+                        gas: 200000  // 设置Gas限制
+                    });
+                    
+                    UIManager.showStatus('签到成功！🎉', 'success');
+                    console.log('签到交易:', result);
+                    
+                    // 签到成功动画效果
+                    checkinBtn.style.animation = 'pulse 0.5s ease-in-out';
+                    
+                    // 签到成功后延迟刷新成员信息
+                    setTimeout(() => {
+                        MemberManager.checkMembership();
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('签到失败:', error);
+                    // 处理不同类型的错误
+                    if (error.message.includes('User denied')) {
+                        UIManager.showStatus('用户取消了交易', 'error');
+                    } else {
+                        UIManager.showStatus('签到失败: ' + error.message, 'error');
+                    }
+                } finally {
+                    // 恢复按钮状态
+                    checkinBtn.classList.remove('loading');
+                    checkinBtn.textContent = '立即签到';
+                    checkinBtn.disabled = false;
+                    
+                    // 重置动画
+                    setTimeout(() => {
+                        checkinBtn.style.animation = '';
+                    }, 500);
+                }
+            }
+        };
+
+        
+
+        
+
+        
+        /**
+         * 监听MetaMask事件
+         * 处理账户切换和网络变化
+         */
+        if (typeof window.ethereum !== 'undefined') {
+            // 监听账户变化事件
+            window.ethereum.on('accountsChanged', function (accounts) {
+                if (accounts.length === 0) {
+                    // 用户断开了所有账户
+                    disconnectWallet();
+                } else if (accounts[0] !== AppState.userAccount) {
+                    // 用户切换了账户
+                    AppState.userAccount = accounts[0];
+                    document.getElementById('walletAddress').textContent = `钱包地址: ${AppState.userAccount}`;
+                    
+                    // 清除旧账户的状态信息
+                    UIManager.clearMemberInfo();
+                    
+                    // 重新检查新账户的成员状态
+                    MemberManager.checkMembership();
+                }
+            });
+            
+            // 监听网络变化事件
+            window.ethereum.on('chainChanged', function (chainId) {
+                // 网络变化时重新加载页面
+                window.location.reload();
+            });
+        }
+        
+
+        
+        /**
+         * 页面初始化
+         * 在页面加载完成后执行初始化操作
+         */
+        window.addEventListener('load', async function() {
+            // 创建背景粒子效果
+            createParticles();
+            
+            // 创建数据流效果
+            createDataStreams();
+            
+            // 检查是否已经连接钱包，如果是则自动连接
+            if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
+                await connectWallet();
+            }
+        });
+    </script>
+</body>
+</html>
