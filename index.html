@@ -153,19 +153,19 @@
 
         @keyframes glitch {
             0%, 100% {
-                transform: translate(0);
+                transform: translateX(-50%) translate(0);
             }
             20% {
-                transform: translate(-2px, 2px);
+                transform: translateX(-50%) translate(-2px, 2px);
             }
             40% {
-                transform: translate(-2px, -2px);
+                transform: translateX(-50%) translate(-2px, -2px);
             }
             60% {
-                transform: translate(2px, 2px);
+                transform: translateX(-50%) translate(2px, 2px);
             }
             80% {
-                transform: translate(2px, -2px);
+                transform: translateX(-50%) translate(2px, -2px);
             }
         }
 
@@ -262,11 +262,35 @@
             }
         }
 
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .logo-image {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 0 10px #00ffff) drop-shadow(0 0 20px #00ffff);
+            animation: logoImageGlow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes logoImageGlow {
+            0% {
+                filter: drop-shadow(0 0 10px #00ffff) drop-shadow(0 0 20px #00ffff);
+            }
+            100% {
+                filter: drop-shadow(0 0 15px #00ffff) drop-shadow(0 0 30px #00ffff) drop-shadow(0 0 40px #00ffff);
+            }
+        }
+
         .logo {
             font-size: 3.5rem;
             font-weight: bold;
             color: #00ffff;
-            margin-bottom: 10px;
+            margin-bottom: 0;
             text-shadow: 
                 0 0 10px #00ffff,
                 0 0 20px #00ffff,
@@ -665,7 +689,10 @@
     <div class="data-streams" id="dataStreams"></div>
     
     <div class="container">
-        <div class="logo" data-text="🗳️ JVCore">🗳️ JVCore</div>
+        <div class="logo-container">
+            <img src="https://jscan.jnsdao.com/jv.svg" alt="JV Logo" class="logo-image" />
+            <div class="logo" data-text="JVCore">JVCore</div>
+        </div>
         <div class="subtitle">区块链签到系统</div>
         
 
@@ -1088,7 +1115,6 @@
                 // 重置所有样式确保正确居中
                 statusEl.style.opacity = '0';
                 statusEl.style.transform = 'translateX(-50%) translateY(-10px)';
-                statusEl.style.left = '50%';
                 statusEl.textContent = message;
                 statusEl.className = `status ${type}`;
                 statusEl.classList.remove('hidden');
