@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>J-Checkin</title>
-    <script src="./web3.min.js"></script>
+    <!-- <script src="./web3.min.js"></script> -->
+    <script src="https://cdn.bootcdn.net/ajax/libs/web3/1.8.2/web3.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -1236,9 +1237,9 @@
                     statusEl.style.color = '#00ff88';
                     statusEl.style.fontWeight = 'bold';
                     statusEl.style.textShadow = '0 0 10px rgba(0, 255, 136, 0.5)';
-                    // 确保签到按钮始终显示
-                    checkinBtn.style.display = 'block';
-                    checkinBtn.classList.remove('hidden');
+                    // 签到按钮保持隐藏状态，由displayLastCheckInTime函数根据时间间隔控制显示
+                    // checkinBtn.style.display = 'block';
+                    // checkinBtn.classList.remove('hidden');
                     if (nonMemberTip) nonMemberTip.style.display = 'none';
                 } else {
                     // 显示非成员状态
@@ -1397,16 +1398,28 @@
                     const formattedTime = Utils.formatTimestamp(latestCheckInTime);
                     lastCheckInTimeEl.textContent = formattedTime;
                     
+                    // 计算距离上次签到的时间间隔（秒）
+                    const currentTime = Math.floor(Date.now() / 1000); // 当前时间戳（秒）
+                    const timeDifference = currentTime - latestCheckInTime;
+                    const canCheckInAgain = timeDifference >= 86400; // 86400秒 = 24小时
+                    
                     // 检查是否为本月签到
                     const isThisMonth = Utils.isCurrentMonth(latestCheckInTime);
                     if (isThisMonth) {
                         checkInStatusEl.textContent = '✅ 本月已签到';
                         checkInStatusEl.style.color = '#00ff88';
                         window.hasCheckedInThisMonth = true;
-                        // 显示签到按钮，允许再次签到
+                        
+                        // 根据时间间隔决定是否显示"再次签到"按钮
                         if (checkinBtn) {
-                            checkinBtn.classList.remove('hidden');
-                            checkinBtn.textContent = '🎯 再次签到';
+                            if (canCheckInAgain) {
+                                // 超过24小时，可以再次签到
+                                checkinBtn.classList.remove('hidden');
+                                checkinBtn.textContent = '🎯 再次签到';
+                            } else {
+                                // 未超过24小时，隐藏按钮
+                                checkinBtn.classList.add('hidden');
+                            }
                         }
                     } else {
                         checkInStatusEl.textContent = '❌ 本月未签到';
