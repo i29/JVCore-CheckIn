@@ -1,0 +1,15 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const root = path.join(__dirname, '..');
+const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+const scripts = [...html.matchAll(/<script\b[^>]*src=["']([^"']+)["']/g)].map((m) => m[1]);
+assert.deepEqual(scripts, ['./web3.min.js', './wallet-compat.js']);
+assert.equal(html.includes(':8503'), false);
+for (const src of scripts) new vm.Script(fs.readFileSync(path.join(root, src), 'utf8'));
+for (const [, code] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(code);
+const output = path.join(root, 'dist');
+fs.mkdirSync(output, { recursive: true });
+for (const file of ['index.html', 'web3.min.js', 'wallet-compat.js']) fs.copyFileSync(path.join(root, file), path.join(output, file));
+console.log('静态页面检查通过：本地依赖齐全、无旧端口、全部脚本语法有效；dist仅输出页面与两个本地脚本，不包含测试依赖。');
