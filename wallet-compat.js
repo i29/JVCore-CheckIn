@@ -6,8 +6,9 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   function getProvider(win) {
+    const injectedProviders = win.ethereum && Array.isArray(win.ethereum.providers) ? win.ethereum.providers : [];
     const candidates = [win.okxwallet && win.okxwallet.ethereum, win.okxwallet,
-      ...(win.ethereum && win.ethereum.providers || []), win.ethereum];
+      ...injectedProviders, win.ethereum];
     return candidates.find((p) => p && typeof p.request === 'function') || null;
   }
   function errorDetails(error) {
@@ -47,14 +48,35 @@
       throw new Error('钱包仍未切换到焦耳链，已阻止后续合约操作');
     }
   }
+  function calculateGasLimit(estimate, numerator = 120n, denominator = 100n) {
+    let gas;
+    try {
+      if (typeof estimate === 'number') {
+        if (!Number.isSafeInteger(estimate) || estimate <= 0) throw new Error('Gas估算值不是安全正整数');
+        gas = BigInt(estimate);
+      } else if (typeof estimate === 'bigint') {
+        gas = estimate;
+      } else if (typeof estimate === 'string' && (/^0x[0-9a-f]+$/i.test(estimate) || /^\d+$/.test(estimate))) {
+        gas = BigInt(estimate);
+      } else {
+        throw new Error('Gas估算值格式无效');
+      }
+    } catch (error) {
+      throw new Error('无法安全计算Gas上限：' + error.message);
+    }
+    if (gas <= 0n) throw new Error('Gas估算值必须大于零');
+    const n = BigInt(numerator), d = BigInt(denominator);
+    if (n <= 0n || d <= 0n) throw new Error('Gas缓冲比例无效');
+    return ((gas * n + d - 1n) / d).toString();
+  }
   async function assertSession(provider, network, expectedAccount) {
     if (!provider || !expectedAccount) throw new Error('钱包未连接');
     const chain = await provider.request({ method: 'eth_chainId' });
     const accounts = await provider.request({ method: 'eth_accounts' });
     if (!sameChain(chain, network.chainId)) throw new Error('网络不正确，已阻止签到，请重新连接');
-    if (!accounts[0] || accounts[0].toLowerCase() !== expectedAccount.toLowerCase()) {
+    if (!accounts[0] || typeof accounts[0] !== 'string' || accounts[0].toLowerCase() !== expectedAccount.toLowerCase()) {
       throw new Error('钱包账户已变化，已阻止签到，请重新连接');
     }
   }
-  return { getProvider, errorDetails, sameChain, ensureChain, assertSession };
+  return { getProvider, errorDetails, sameChain, ensureChain, assertSession, calculateGasLimit };
 });
