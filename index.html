@@ -793,7 +793,8 @@
         function disconnectWallet() {
             const disconnectBtn = document.getElementById('disconnectBtn');
             
-            // 添加断开连接动画效果
+            // 使所有尚未完成的连接、读取及签到请求立即失效。
+            walletSessionEpoch++;
             disconnectBtn.style.animation = 'pulse 0.3s ease-in-out';
             
             AppState.reset();                    // 重置应用状态
@@ -1509,8 +1510,17 @@
                     );
                     if (!successful) throw new Error('链上交易未成功，请核查交易回执');
                     if (!receipt.transactionHash) throw new Error('交易回执缺少交易哈希，无法完成结果核验');
+                    const checkInTopic = Web3.utils.sha3('CheckIn(uint256,uint256,uint256)');
+                    const decodedEvent = receipt.events && receipt.events.CheckIn;
+                    const rawEvent = Array.isArray(receipt.logs) && receipt.logs.some((log) =>
+                        log.address && log.address.toLowerCase() === CONFIG.contracts.jvcore.toLowerCase()
+                        && Array.isArray(log.topics) && log.topics[0] === checkInTopic
+                    );
+                    if (!decodedEvent && !rawEvent) {
+                        throw new Error('交易已成功上链，但未找到本合约的 CheckIn 签到事件；暂不显示签到成功，请核查交易');
+                    }
 
-                    UIManager.showStatus('签到成功！交易已上链：' + receipt.transactionHash, 'success');
+                    UIManager.showStatus('签到成功！链上签到事件已验证：' + receipt.transactionHash, 'success');
                     console.log('签到交易回执:', receipt);
                     checkinBtn.style.animation = 'pulse 0.5s ease-in-out';
                     setTimeout(() => {
