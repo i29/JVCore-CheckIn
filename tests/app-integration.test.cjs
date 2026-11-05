@@ -40,6 +40,7 @@ function fixture(options = {}) {
     }),
   } };
   w.Web3 = class { constructor() { this.eth = { Contract: class { constructor() { return contract; } } }; } };
+  w.Web3.utils = { sha3: () => '0xcheckineventtopic' };
   w.eval(helper); w.eval(app + "\nwindow.__testApp = { AppState, CheckInManager };" );
   return { dom, w, provider, calls, listeners, get sent() { return sent; } };
 }
