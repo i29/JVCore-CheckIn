@@ -36,7 +36,8 @@ function fixture(options = {}) {
     tokenURI: () => ({ call: async () => 'data:application/json;base64,' + Buffer.from(JSON.stringify({ lastCheckInTime: '0' })).toString('base64') }),
     checkIn: () => ({
       estimateGas: async () => { if (options.estimateFails) throw new Error('模拟回滚'); if (options.accountChangeDuringEstimate) await listeners.get('accountsChanged')([]); return 100000; },
-      send: async (args) => { sent++; assert.equal(args.from, A); return { status: options.receiptStatus ?? true, transactionHash: '0x' + 'a'.repeat(64), events: options.omitCheckInEvent ? {} : { CheckIn: { returnValues: {} } } }; },
+      send: async (args) => { sent++; assert.equal(args.from, A); return { status: options.receiptStatus ?? true, transactionHash: '0x' + 'a'.repeat(64), events: options.omitCheckInEvent || options.rawCheckInEvent || options.foreignCheckInEvent ? {} : { CheckIn: { address: options.foreignCheckInEvent ? '0x0000000000000000000000000000000000000001' : '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392', returnValues: { tokenId: options.foreignCheckInEvent ? '99' : '0' } } },
+        logs: options.rawCheckInEvent ? [{ address: '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392', topics: ['0xcheckineventtopic', '0x0'] }] : [] }; },
     }),
   } };
   w.Web3 = class { constructor() { this.eth = { Contract: class { constructor() { return contract; } } }; } };
@@ -144,5 +145,22 @@ test('成功回执但缺少签到事件时不显示签到成功', async () => {
     assert.equal(f.w.document.getElementById('statusMessage').textContent.includes('链上签到事件已验证'), false);
     assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
     assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
+  } finally { f.dom.window.close(); }
+});
+
+test('只接受来自签到合约且Token编号匹配的签到事件', async () => {
+  const f = fixture({ foreignCheckInEvent: true });
+  try {
+    await f.w.connectWallet();
+    await f.w.__testApp.CheckInManager.performCheckIn();
+    assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
+  } finally { f.dom.window.close(); }
+});
+test('当Web3未解码事件时可用原始日志验证正确签到事件', async () => {
+  const f = fixture({ rawCheckInEvent: true });
+  try {
+    await f.w.connectWallet();
+    await f.w.__testApp.CheckInManager.performCheckIn();
+    assert.match(f.w.document.getElementById('statusMessage').textContent, /链上签到事件已验证/);
   } finally { f.dom.window.close(); }
 });
