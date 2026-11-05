@@ -28,3 +28,12 @@ test('签到实现包含会话版本校验及精确Gas计算', () => {
   assert.match(html, /calculateGasLimit\(gasEstimate\)/);
   assert.doesNotMatch(html, /Math\.ceil\(Number\(gasEstimate\)\s*\*\s*1\.2\)/);
 });
+
+test('成功提示必须核验交易哈希和CheckIn事件', () => {
+  const fs = require('node:fs');
+  const html = fs.readFileSync(require('node:path').join(__dirname, '../index.html'), 'utf8');
+  assert.match(html, /receipt\\.transactionHash/);
+  assert.match(html, /CheckIn\\(uint256,uint256,uint256\\)/);
+  assert.match(html, /receipt\\.events && receipt\\.events\\.CheckIn/);
+  assert.match(html, /链上签到事件已验证/);
+});
