@@ -36,7 +36,7 @@ function fixture(options = {}) {
     tokenURI: () => ({ call: async () => 'data:application/json;base64,' + Buffer.from(JSON.stringify({ lastCheckInTime: '0' })).toString('base64') }),
     checkIn: () => ({
       estimateGas: async () => { if (options.estimateFails) throw new Error('模拟回滚'); if (options.accountChangeDuringEstimate) await listeners.get('accountsChanged')([]); return 100000; },
-      send: async (args) => { sent++; assert.equal(args.from, A); return { status: options.receiptStatus ?? true }; },
+      send: async (args) => { sent++; assert.equal(args.from, A); return { status: options.receiptStatus ?? true, transactionHash: '0x' + 'a'.repeat(64), events: options.omitCheckInEvent ? {} : { CheckIn: { returnValues: {} } } }; },
     }),
   } };
   w.Web3 = class { constructor() { this.eth = { Contract: class { constructor() { return contract; } } }; } };
@@ -101,7 +101,7 @@ test('双击签到只提交一次，成功回执才展示成功', async () => {
     await f.w.connectWallet();
     await Promise.all([f.w.__testApp.CheckInManager.performCheckIn(), f.w.__testApp.CheckInManager.performCheckIn()]);
     assert.equal(f.sent, 1); assert.equal(f.w.__testApp.CheckInManager.busy, false);
-    assert.equal(f.w.document.getElementById('statusMessage').textContent, '签到成功！🎉');
+    assert.match(f.w.document.getElementById('statusMessage').textContent, /链上签到事件已验证/);
   } finally { f.dom.window.close(); }
 });
 test('失败回执不显示签到成功', async () => {
@@ -131,5 +131,16 @@ test('成员查询未返回时断连，旧查询不能恢复成员面板', async
     release('1'); await connecting;
     assert.equal(f.w.__testApp.AppState.userAccount, null);
     assert.equal(f.w.document.getElementById('memberNumbers').style.display, 'none');
+  } finally { f.dom.window.close(); }
+});
+
+test('成功回执但缺少签到事件时不显示签到成功', async () => {
+  const f = fixture({ omitCheckInEvent: true });
+  try {
+    await f.w.connectWallet();
+    await f.w.__testApp.CheckInManager.performCheckIn();
+    assert.equal(f.sent, 1);
+    assert.equal(f.w.document.getElementById('statusMessage').textContent.includes('签到成功'), false);
+    assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
   } finally { f.dom.window.close(); }
 });
