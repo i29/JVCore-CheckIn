@@ -141,7 +141,8 @@ test('成功回执但缺少签到事件时不显示签到成功', async () => {
     await f.w.connectWallet();
     await f.w.__testApp.CheckInManager.performCheckIn();
     assert.equal(f.sent, 1);
-    assert.equal(f.w.document.getElementById('statusMessage').textContent.includes('签到成功'), false);
+    assert.equal(f.w.document.getElementById('statusMessage').textContent.includes('链上签到事件已验证'), false);
+    assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
     assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
   } finally { f.dom.window.close(); }
 });
