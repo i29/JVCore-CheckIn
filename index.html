@@ -797,6 +797,11 @@
             walletSessionEpoch++;
             disconnectBtn.style.animation = 'pulse 0.3s ease-in-out';
             
+            walletSessionEpoch++;
+            const connectBtn = document.getElementById('connectBtn');
+            connectBtn.classList.remove('loading');
+            connectBtn.textContent = '连接钱包';
+            connectBtn.disabled = false;
             AppState.reset();                    // 重置应用状态
             UIManager.updateWalletUI(false);    // 更新UI为未连接状态
             UIManager.showStatus('钱包已断开连接', 'info');
@@ -1569,6 +1574,10 @@
         async function onAccountsChanged(accounts) {
             walletSessionEpoch++;
             AppState.reset();
+            const connectBtn = document.getElementById('connectBtn');
+            connectBtn.classList.remove('loading');
+            connectBtn.textContent = '连接钱包';
+            connectBtn.disabled = false;
             UIManager.updateWalletUI(false);
             UIManager.clearMemberInfo();
             if (!accounts || !accounts.length) {
@@ -1581,6 +1590,10 @@
             if (!JVWallet.sameChain(chainId, CONFIG.network.chainId)) {
                 walletSessionEpoch++;
                 AppState.reset();
+                const connectBtn = document.getElementById('connectBtn');
+                connectBtn.classList.remove('loading');
+                connectBtn.textContent = '连接钱包';
+                connectBtn.disabled = false;
                 UIManager.updateWalletUI(false);
                 UIManager.clearMemberInfo();
                 UIManager.showStatus('网络已切换，请连接焦耳链后重试', 'error');
