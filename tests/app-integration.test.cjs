@@ -91,8 +91,10 @@ test('账户变化后清除旧连接，旧成员状态不能授权支付', async
   const f = fixture();
   try {
     await f.w.connectWallet();
+    f.w.hasCheckedInThisMonth = true;
     await f.listeners.get('accountsChanged')([A]);
     assert.equal(f.w.__testApp.AppState.userAccount, null);
+    assert.equal(f.w.hasCheckedInThisMonth, false);
     await f.w.__testApp.CheckInManager.performCheckIn(); assert.equal(f.sent, 0);
   } finally { f.dom.window.close(); }
 });
