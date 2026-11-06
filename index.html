@@ -1219,9 +1219,13 @@
              * 清除成员信息显示
              */
             clearMemberInfo() {
+                // 钱包账户变化后，绝不沿用上一个账户的月度签到状态。
+                window.hasCheckedInThisMonth = false;
                 document.getElementById('memberStatus').textContent = '检查中...';
                 document.getElementById('memberNumbers').style.display = 'none';
                 document.getElementById('lastCheckInInfo').style.display = 'none';
+                const checkInStatus = document.getElementById('checkInStatus');
+                if (checkInStatus) checkInStatus.textContent = '等待核验';
             },
             
             /**
