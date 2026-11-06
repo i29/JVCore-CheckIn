@@ -14,9 +14,13 @@ function fixture(options = {}) {
   const listeners = new Map();
   let chain = options.chain || '0xe52';
   const calls = [];
+  let releaseAccounts = null;
   const provider = {
     async request({ method, params }) {
       calls.push(method);
+      if (method === 'eth_requestAccounts' && options.deferAccounts) {
+        return new Promise((resolve) => { releaseAccounts = () => resolve([A]); });
+      }
       if (method === 'eth_requestAccounts' || method === 'eth_accounts') return [A];
       if (method === 'eth_chainId') return chain;
       if (method === 'wallet_switchEthereumChain') {
@@ -36,14 +40,16 @@ function fixture(options = {}) {
     tokenURI: () => ({ call: async () => 'data:application/json;base64,' + Buffer.from(JSON.stringify({ lastCheckInTime: '0' })).toString('base64') }),
     checkIn: () => ({
       estimateGas: async () => { if (options.estimateFails) throw new Error('模拟回滚'); if (options.accountChangeDuringEstimate) await listeners.get('accountsChanged')([]); return 100000; },
-      send: async (args) => { sent++; assert.equal(args.from, A); return { status: options.receiptStatus ?? true, transactionHash: '0x' + 'a'.repeat(64), events: options.omitCheckInEvent || options.rawCheckInEvent || options.foreignCheckInEvent ? {} : { CheckIn: { address: options.foreignCheckInEvent ? '0x0000000000000000000000000000000000000001' : '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392', returnValues: { tokenId: options.foreignCheckInEvent ? '99' : '0' } } },
-        logs: options.rawCheckInEvent ? [{ address: '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392', topics: ['0xcheckineventtopic', '0x0'] }] : [] }; },
+      send: async (args) => { sent++; assert.equal(args.from, A); return { status: options.receiptStatus ?? true, transactionHash: '0x' + 'a'.repeat(64), events: options.omitCheckInEvent || options.rawCheckInEvent || options.foreignCheckInEvent || options.wrongTokenId ? {} : { CheckIn: { address: '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392', returnValues: { tokenId: '0' } } },
+        logs: options.rawCheckInEvent ? [{ address: '0x8d214415b9c5F5E4Cf4CbCfb4a5DEd47fb516392', topics: [w.Web3.utils.sha3('CheckIn(uint256,uint256,uint256)'), '0x0'] }] : [] }; },
     }),
   } };
+  w.eval(fs.readFileSync(path.join(__dirname, '../web3.min.js'), 'utf8'));
+  const realWeb3Utils = w.Web3.utils;
   w.Web3 = class { constructor() { this.eth = { Contract: class { constructor() { return contract; } } }; } };
-  w.Web3.utils = { sha3: () => '0xcheckineventtopic' };
-  w.eval(helper); w.eval(app + "\nwindow.__testApp = { AppState, CheckInManager };" );
-  return { dom, w, provider, calls, listeners, get sent() { return sent; } };
+  w.Web3.utils = realWeb3Utils;
+  w.eval(helper); w.eval(app + "\nwindow.__testApp = { AppState, CheckInManager, getEpoch: () => walletSessionEpoch };" );
+  return { dom, w, provider, calls, listeners, get releaseAccounts() { return releaseAccounts; }, get sent() { return sent; } };
 }
 test('本地托管的真实Web3脚本可以初始化，不依赖外部脚本', () => {
   const dom = new JSDOM('', { runScripts: 'outside-only', url: 'https://example.test/' });
@@ -144,7 +150,6 @@ test('成功回执但缺少签到事件时不显示签到成功', async () => {
     assert.equal(f.sent, 1);
     assert.equal(f.w.document.getElementById('statusMessage').textContent.includes('链上签到事件已验证'), false);
     assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
-    assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
   } finally { f.dom.window.close(); }
 });
 
@@ -162,5 +167,31 @@ test('当Web3未解码事件时可用原始日志验证正确签到事件', asyn
     await f.w.connectWallet();
     await f.w.__testApp.CheckInManager.performCheckIn();
     assert.match(f.w.document.getElementById('statusMessage').textContent, /链上签到事件已验证/);
+  } finally { f.dom.window.close(); }
+});
+
+test('手动断开只递增一次会话版本，并使未完成的连接失效', async () => {
+  const f = fixture({ deferAccounts: true });
+  try {
+    const connecting = f.w.connectWallet();
+    await Promise.resolve();
+    assert.equal(typeof f.releaseAccounts, 'function');
+    const before = f.w.__testApp.getEpoch();
+    f.w.disconnectWallet();
+    assert.equal(f.w.__testApp.getEpoch(), before + 1);
+    f.releaseAccounts();
+    await connecting;
+    assert.equal(f.w.__testApp.AppState.userAccount, null);
+    assert.equal(f.w.__testApp.AppState.provider, null);
+    assert.equal(f.w.document.getElementById('connectBtn').disabled, false);
+  } finally { f.dom.window.close(); }
+});
+test('来自正确合约但Token编号不匹配的事件不能验证签到成功', async () => {
+  const f = fixture({ wrongTokenId: true });
+  try {
+    await f.w.connectWallet();
+    await f.w.__testApp.CheckInManager.performCheckIn();
+    assert.equal(f.w.document.getElementById('statusMessage').textContent.includes('链上签到事件已验证'), false);
+    assert.equal(f.w.document.getElementById('statusMessage').classList.contains('error'), true);
   } finally { f.dom.window.close(); }
 });
