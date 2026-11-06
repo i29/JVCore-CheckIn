@@ -796,8 +796,6 @@
             // 使所有尚未完成的连接、读取及签到请求立即失效。
             walletSessionEpoch++;
             disconnectBtn.style.animation = 'pulse 0.3s ease-in-out';
-            
-            walletSessionEpoch++;
             const connectBtn = document.getElementById('connectBtn');
             connectBtn.classList.remove('loading');
             connectBtn.textContent = '连接钱包';
@@ -1330,17 +1328,21 @@
             async displayMemberNumbers(account, contract, current) {
                 try {
                     const balance = await contract.methods.balanceOf(account).call();
+                    if (!current()) return;
                     const memberNumbers = [];
                     let latestCheckInTime = 0;
                     
                     // 遍历用户持有的所有NFT
                     for (let i = 0; i < balance; i++) {
+                        if (!current()) return;
                         const tokenId = await contract.methods.tokenOfOwnerByIndex(account, i).call();
+                        if (!current()) return;
                         memberNumbers.push(tokenId);
                         
                         try {
                              // 获取NFT元数据
                              const tokenURI = await contract.methods.tokenURI(tokenId).call();
+                             if (!current()) return;
                              const metadata = Utils.parseTokenMetadata(tokenURI);
                             
                             // 查找最新的签到时间
@@ -1622,7 +1624,12 @@
                 if (epoch === walletSessionEpoch) {
                     walletSessionEpoch++;
                     AppState.reset();
+                    const connectBtn = document.getElementById('connectBtn');
+                    connectBtn.classList.remove('loading');
+                    connectBtn.textContent = '连接钱包';
+                    connectBtn.disabled = false;
                     UIManager.updateWalletUI(false);
+                    UIManager.clearMemberInfo();
                     UIManager.showStatus(error.message, 'error');
                 }
             }
