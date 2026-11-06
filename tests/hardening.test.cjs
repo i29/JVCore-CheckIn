@@ -35,5 +35,7 @@ test('成功提示必须核验交易哈希和CheckIn事件', () => {
   assert.ok(html.includes('receipt.transactionHash'));
   assert.ok(html.includes('CheckIn(uint256,uint256,uint256)'));
   assert.ok(html.includes('receipt.events && receipt.events.CheckIn'));
+  assert.ok(html.includes('event.returnValues.tokenId'));
+  assert.ok(html.includes('log.topics[1]'));
   assert.ok(html.includes('链上签到事件已验证'));
 });
