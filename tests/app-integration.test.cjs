@@ -92,10 +92,21 @@ test('账户变化后清除旧连接，旧成员状态不能授权支付', async
   try {
     await f.w.connectWallet();
     f.w.hasCheckedInThisMonth = true;
-    await f.listeners.get('accountsChanged')([A]);
+    const B = '0x2222222222222222222222222222222222222222';
+    await f.listeners.get('accountsChanged')([B]);
     assert.equal(f.w.__testApp.AppState.userAccount, null);
     assert.equal(f.w.hasCheckedInThisMonth, false);
     await f.w.__testApp.CheckInManager.performCheckIn(); assert.equal(f.sent, 0);
+  } finally { f.dom.window.close(); }
+});
+test('同一账户的重复 accountsChanged 事件不误清空连接', async () => {
+  const f = fixture();
+  try {
+    await f.w.connectWallet();
+    f.w.hasCheckedInThisMonth = true;
+    await f.listeners.get('accountsChanged')([A]);
+    assert.equal(f.w.__testApp.AppState.userAccount, A);
+    assert.equal(f.w.hasCheckedInThisMonth, true);
   } finally { f.dom.window.close(); }
 });
 test('估算回滚不再降级固定gas并盲发', async () => {

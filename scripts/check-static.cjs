@@ -11,5 +11,5 @@ for (const src of scripts) new vm.Script(fs.readFileSync(path.join(root, src), '
 for (const [, code] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(code);
 const output = path.join(root, 'dist');
 fs.mkdirSync(output, { recursive: true });
-for (const file of ['index.html', 'web3.min.js', 'wallet-compat.js']) fs.copyFileSync(path.join(root, file), path.join(output, file));
-console.log('静态页面检查通过：本地依赖齐全、无旧端口、全部脚本语法有效；dist仅输出页面与两个本地脚本，不包含测试依赖。');
+for (const file of ['index.html', 'web3.min.js', 'wallet-compat.js', 'jv.svg']) fs.copyFileSync(path.join(root, file), path.join(output, file));
+console.log('静态页面检查通过：本地依赖齐全、无旧端口、全部脚本语法有效；dist 输出页面、两个本地脚本与 jv.svg，不包含测试依赖。');

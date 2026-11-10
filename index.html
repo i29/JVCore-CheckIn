@@ -759,13 +759,14 @@
                 UIManager.showStatus('正在连接钱包...', 'info');
                 AppState.reset();
                 AppState.provider = provider;
-                bindWalletEvents(provider);
                 const accounts = await provider.request({ method: 'eth_requestAccounts' });
                 if (!isCurrent()) return;
                 if (!accounts || !accounts[0]) throw new Error('钱包没有返回可用账户');
                 const account = accounts[0];
                 AppState.userAccount = account;
                 AppState.web3 = new Web3(provider);
+                lastAccount = String(account).toLowerCase();
+                bindWalletEvents(provider);
                 await NetworkManager.switchToCorrectNetwork();
                 if (!isCurrent() || AppState.provider !== provider || AppState.userAccount !== account) return;
                 await JVWallet.assertSession(provider, CONFIG.network, account);
@@ -801,6 +802,7 @@
             connectBtn.textContent = '连接钱包';
             connectBtn.disabled = false;
             AppState.reset();                    // 重置应用状态
+            lastAccount = null;
             UIManager.updateWalletUI(false);    // 更新UI为未连接状态
             UIManager.showStatus('钱包已断开连接', 'info');
             
@@ -1585,7 +1587,11 @@
          * 处理账户切换和网络变化
          */
         let boundProvider = null;
+        let lastAccount = null;
         async function onAccountsChanged(accounts) {
+            const nextAccount = accounts && accounts.length ? String(accounts[0]).toLowerCase() : null;
+            if (nextAccount === lastAccount) return;
+            lastAccount = nextAccount;
             walletSessionEpoch++;
             AppState.reset();
             const connectBtn = document.getElementById('connectBtn');
