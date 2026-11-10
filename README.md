@@ -28,7 +28,7 @@
 ```
 网络名称: JNS DAO Network
 链 ID: 3666 (0xe52)
-RPC URL: https://rpc.jnsdao.com:8503
+RPC URL: https://rpc.jnsdao.com
 货币符号: J
 区块浏览器: https://jscan.jnsdao.com
 ```

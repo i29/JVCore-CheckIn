@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>J-Checkin</title>
-    <!-- <script src="./web3.min.js"></script> -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/web3/1.8.2/web3.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Exo+2:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="./web3.min.js"></script>
+    <script src="./wallet-compat.js"></script>
+    <!-- 使用系统字体回退，不以外部字体服务阻塞页面加载。 -->
     <style>
         * {
             margin: 0;
@@ -737,69 +737,72 @@
         // Web3.js 已通过 script 标签直接引用，无需动态加载
         
         // 全局函数定义 - 需要在HTML onclick中使用
+        let walletSessionEpoch = 0;
+
         async function connectWallet() {
             const connectBtn = document.getElementById('connectBtn');
-            
-            // 检查Web3是否已加载
+            const connectEpoch = ++walletSessionEpoch;
+            const isCurrent = () => connectEpoch === walletSessionEpoch;
             if (typeof Web3 === 'undefined') {
                 UIManager.showStatus('Web3正在加载中，请稍后再试...', 'error');
                 return;
             }
-            
-            // 检查是否安装了MetaMask
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    // 添加加载状态
-                    connectBtn.classList.add('loading');
-                    connectBtn.textContent = '连接中...';
-                    connectBtn.disabled = true;
-                    
-                    UIManager.showStatus('正在连接钱包...', 'info');
-                    
-                    // 请求用户授权访问账户
-                    const accounts = await window.ethereum.request({
-                        method: 'eth_requestAccounts'
-                    });
-                    
-                    // 保存用户账户和Web3实例
-                    AppState.userAccount = accounts[0];
-                    AppState.web3 = new Web3(window.ethereum);
-                    
-                    // 检查并切换到正确的区块链网络
-                    await NetworkManager.switchToCorrectNetwork();
-                    
-                    // 初始化智能合约实例
-                    ContractManager.initialize();
-                    
-                    // 更新用户界面
-                    UIManager.updateWalletUI(true);
-                    
-                    UIManager.showStatus('钱包连接成功！', 'success');
-                    
-                    // 检查用户成员状态
-                    await MemberManager.checkMembership();
-                    
-                } catch (error) {
+            const provider = JVWallet.getProvider(window);
+            if (!provider) {
+                UIManager.showStatus('未检测到钱包，请在欧易或小狐狸钱包浏览器中打开', 'error');
+                return;
+            }
+            try {
+                connectBtn.classList.add('loading');
+                connectBtn.textContent = '连接中...';
+                connectBtn.disabled = true;
+                UIManager.showStatus('正在连接钱包...', 'info');
+                AppState.reset();
+                AppState.provider = provider;
+                const accounts = await provider.request({ method: 'eth_requestAccounts' });
+                if (!isCurrent()) return;
+                if (!accounts || !accounts[0]) throw new Error('钱包没有返回可用账户');
+                const account = accounts[0];
+                AppState.userAccount = account;
+                AppState.web3 = new Web3(provider);
+                lastAccount = String(account).toLowerCase();
+                bindWalletEvents(provider);
+                await NetworkManager.switchToCorrectNetwork();
+                if (!isCurrent() || AppState.provider !== provider || AppState.userAccount !== account) return;
+                await JVWallet.assertSession(provider, CONFIG.network, account);
+                if (!isCurrent() || AppState.provider !== provider || AppState.userAccount !== account) return;
+                ContractManager.initialize();
+                UIManager.updateWalletUI(true);
+                UIManager.showStatus('钱包连接成功！', 'success');
+                await MemberManager.checkMembership();
+            } catch (error) {
+                if (isCurrent()) {
+                    AppState.reset();
+                    UIManager.updateWalletUI(false);
                     console.error('连接钱包失败:', error);
-                    UIManager.showStatus('连接钱包失败: ' + error.message, 'error');
-                } finally {
-                    // 恢复按钮状态
+                    UIManager.showStatus('连接钱包失败: ' + (error && error.message ? error.message : String(error)), 'error');
+                }
+            } finally {
+                if (isCurrent()) {
                     connectBtn.classList.remove('loading');
                     connectBtn.textContent = '连接钱包';
                     connectBtn.disabled = false;
                 }
-            } else {
-                UIManager.showStatus('请安装 MetaMask 钱包！', 'error');
             }
         }
         
         function disconnectWallet() {
             const disconnectBtn = document.getElementById('disconnectBtn');
             
-            // 添加断开连接动画效果
+            // 使所有尚未完成的连接、读取及签到请求立即失效。
+            walletSessionEpoch++;
             disconnectBtn.style.animation = 'pulse 0.3s ease-in-out';
-            
+            const connectBtn = document.getElementById('connectBtn');
+            connectBtn.classList.remove('loading');
+            connectBtn.textContent = '连接钱包';
+            connectBtn.disabled = false;
             AppState.reset();                    // 重置应用状态
+            lastAccount = null;
             UIManager.updateWalletUI(false);    // 更新UI为未连接状态
             UIManager.showStatus('钱包已断开连接', 'info');
             
@@ -941,6 +944,7 @@
      * 统一管理Web3实例、用户账户和智能合约实例
      */
     const AppState = {
+            provider: null,          // 当前选中的欧易或通用钱包
             web3: null,              // Web3实例
             userAccount: null,       // 当前连接的用户账户地址
             contracts: {
@@ -949,6 +953,7 @@
             
             // 重置所有状态
             reset() {
+                this.provider = null;
                 this.web3 = null;
                 this.userAccount = null;
                 this.contracts.jvcore = null;
@@ -981,7 +986,7 @@
                     symbol: 'J',
                     decimals: 18
                 },
-                rpcUrls: ['https://rpc.jnsdao.com:8503'],
+                rpcUrls: ['https://rpc.jnsdao.com'],
                 blockExplorerUrls: ['https://jscan.jnsdao.com']
             }
         };
@@ -1216,9 +1221,13 @@
              * 清除成员信息显示
              */
             clearMemberInfo() {
+                // 钱包账户变化后，绝不沿用上一个账户的月度签到状态。
+                window.hasCheckedInThisMonth = false;
                 document.getElementById('memberStatus').textContent = '检查中...';
                 document.getElementById('memberNumbers').style.display = 'none';
                 document.getElementById('lastCheckInInfo').style.display = 'none';
+                const checkInStatus = document.getElementById('checkInStatus');
+                if (checkInStatus) checkInStatus.textContent = '等待核验';
             },
             
             /**
@@ -1263,33 +1272,7 @@
              * @throws {Error} 当网络切换或添加失败时抛出错误
              */
             async switchToCorrectNetwork() {
-                try {
-                    // 尝试切换到目标网络
-                    await window.ethereum.request({
-                        method: 'wallet_switchEthereumChain',
-                        params: [{ chainId: CONFIG.network.chainId }]
-                    });
-                    UIManager.showStatus('已切换到 JNS DAO 网络', 'success');
-                } catch (switchError) {
-                    // 如果网络不存在(错误码4902)，则添加网络
-                    if (switchError.code === 4902) {
-                        try {
-                            await window.ethereum.request({
-                                method: 'wallet_addEthereumChain',
-                                params: [CONFIG.network]
-                            });
-                            UIManager.showStatus('JNS DAO 网络添加成功！', 'success');
-                        } catch (addError) {
-                            console.error('添加网络失败:', addError);
-                            UIManager.showStatus('添加网络失败: ' + addError.message, 'error');
-                            throw addError;
-                        }
-                    } else {
-                        console.error('切换网络失败:', switchError);
-                        UIManager.showStatus('切换网络失败: ' + switchError.message, 'error');
-                        throw switchError;
-                    }
-                }
+                await JVWallet.ensureChain(AppState.provider, CONFIG.network);
             }
         };
 
@@ -1318,19 +1301,26 @@
                     return;
                 }
                 
+                const account = AppState.userAccount;
+                const provider = AppState.provider;
+                const contract = AppState.contracts.jvcore;
+                const request = this.request = (this.request || 0) + 1;
+                const current = () => this.request === request && AppState.userAccount === account && AppState.provider === provider && AppState.contracts.jvcore === contract;
                 try {
                     UIManager.clearMemberInfo();
                     
                     // 查询用户持有的NFT数量
-                    const balance = await AppState.contracts.jvcore.methods.balanceOf(AppState.userAccount).call();
+                    const balance = await contract.methods.balanceOf(account).call();
+                    if (!current()) return;
                     const isMember = balance > 0;
                     
                     UIManager.updateMemberStatus(isMember, balance);
                     
                     if (isMember) {
-                        await this.displayMemberNumbers();
+                        await this.displayMemberNumbers(account, contract, current);
                     }
                 } catch (error) {
+                    if (!current()) return;
                     console.error('检查成员资格失败:', error);
                     document.getElementById('memberStatus').textContent = '检查失败';
                     UIManager.showStatus('检查成员资格失败: ' + error.message, 'error');
@@ -1341,20 +1331,24 @@
              * 显示成员编号和最后签到时间
              * 遍历用户持有的所有NFT并显示相关信息
              */
-            async displayMemberNumbers() {
+            async displayMemberNumbers(account, contract, current) {
                 try {
-                    const balance = await AppState.contracts.jvcore.methods.balanceOf(AppState.userAccount).call();
+                    const balance = await contract.methods.balanceOf(account).call();
+                    if (!current()) return;
                     const memberNumbers = [];
                     let latestCheckInTime = 0;
                     
                     // 遍历用户持有的所有NFT
                     for (let i = 0; i < balance; i++) {
-                        const tokenId = await AppState.contracts.jvcore.methods.tokenOfOwnerByIndex(AppState.userAccount, i).call();
+                        if (!current()) return;
+                        const tokenId = await contract.methods.tokenOfOwnerByIndex(account, i).call();
+                        if (!current()) return;
                         memberNumbers.push(tokenId);
                         
                         try {
                              // 获取NFT元数据
-                             const tokenURI = await AppState.contracts.jvcore.methods.tokenURI(tokenId).call();
+                             const tokenURI = await contract.methods.tokenURI(tokenId).call();
+                             if (!current()) return;
                              const metadata = Utils.parseTokenMetadata(tokenURI);
                             
                             // 查找最新的签到时间
@@ -1369,6 +1363,7 @@
                         }
                     }
                     
+                    if (!current()) return;
                     // 显示成员编号列表
                     document.getElementById('memberNumbersList').textContent = memberNumbers.join(', ');
                     document.getElementById('memberNumbers').style.display = 'block';
@@ -1377,6 +1372,7 @@
                     this.displayLastCheckInTime(latestCheckInTime);
                     
                 } catch (error) {
+                    if (!current()) return;
                     console.error('获取成员编号失败:', error);
                     UIManager.showStatus('获取成员信息失败: ' + error.message, 'error');
                 }
@@ -1460,20 +1456,24 @@
              */
             async performCheckIn() {
                 const checkinBtn = document.getElementById('checkinBtn');
-                
-                // 检查钱包连接状态
-                if (!AppState.userAccount) {
+                if (this.busy) return;
+                const signingAccount = AppState.userAccount;
+                const signingProvider = AppState.provider;
+                const contract = AppState.contracts.jvcore;
+                const signingEpoch = walletSessionEpoch;
+                const isCurrent = () => signingEpoch === walletSessionEpoch
+                    && AppState.userAccount === signingAccount
+                    && AppState.provider === signingProvider
+                    && AppState.contracts.jvcore === contract;
+
+                if (!signingAccount || !signingProvider) {
                     UIManager.showStatus('请先连接钱包！', 'error');
                     return;
                 }
-                
-                // 检查合约初始化状态
-                if (!AppState.areContractsReady()) {
-                    UIManager.showStatus('签到合约未初始化，请刷新页面重试', 'error');
+                if (!contract) {
+                    UIManager.showStatus('签到合约未初始化，请重新连接钱包', 'error');
                     return;
                 }
-                
-                // 检查本月是否已签到
                 if (window.hasCheckedInThisMonth) {
                     const confirmReCheckIn = confirm('您本月已经签到过了，是否要再次签到？');
                     if (!confirmReCheckIn) {
@@ -1481,150 +1481,98 @@
                         return;
                     }
                 }
-                
+
+                this.busy = true;
+                checkinBtn.classList.add('loading');
+                checkinBtn.textContent = '签到中...';
+                checkinBtn.disabled = true;
                 try {
-                    // 添加加载状态
-                    checkinBtn.classList.add('loading');
-                    checkinBtn.textContent = '签到中...';
-                    checkinBtn.disabled = true;
-                    
+                    await JVWallet.assertSession(signingProvider, CONFIG.network, signingAccount);
+                    if (!isCurrent()) throw new Error('钱包会话已变化，已停止本次签到');
                     UIManager.showStatus('正在获取NFT信息...', 'info');
-                    
-                    // 获取用户持有的第一个JVCore NFT的tokenId
-                    let userTokenId;
-                    try {
-                        const balance = await AppState.contracts.jvcore.methods.balanceOf(AppState.userAccount).call();
-                        if (parseInt(balance) === 0) {
-                            throw new Error('签到失败：您不是JVCore成员，请先获取JVCore NFT。');
-                        }
-                        
-                        // 获取用户持有的第一个NFT的tokenId
-                        userTokenId = await AppState.contracts.jvcore.methods.tokenOfOwnerByIndex(AppState.userAccount, 0).call();
-                        console.log('用户NFT tokenId:', userTokenId);
-                    } catch (tokenError) {
-                        console.error('获取NFT tokenId失败:', tokenError);
-                        if (tokenError.message.startsWith('签到失败：')) {
-                            throw tokenError;
-                        }
-                        throw new Error('签到失败：无法获取NFT信息，请确保您持有JVCore NFT。');
+
+                    const balance = await contract.methods.balanceOf(signingAccount).call();
+                    if (!isCurrent()) throw new Error('钱包会话已变化，已停止本次签到');
+                    if (BigInt(balance) <= 0n) {
+                        throw new Error('签到失败：您不是JVCore成员，请先获取JVCore NFT。');
                     }
-                    
-                    UIManager.showStatus('正在签到...', 'info');
-                    
-                    // 先估算Gas费用
-                    let gasEstimate;
-                    try {
-                        gasEstimate = await AppState.contracts.jvcore.methods.checkIn(userTokenId).estimateGas({
-                            from: AppState.userAccount
-                        });
-                        console.log('Gas估算:', gasEstimate);
-                    } catch (estimateError) {
-                        console.error('Gas估算失败:', estimateError);
-                        
-                        // 当Gas估算失败时，检查具体原因
-                        let errorMessage = '签到失败：';
-                        
-                        try {
-                            // 检查用户是否为JVCore成员
-                            const balance = await AppState.contracts.jvcore.methods.balanceOf(AppState.userAccount).call();
-                            if (parseInt(balance) === 0) {
-                                errorMessage += '您不是JVCore成员，请先获取JVCore NFT。';
-                                throw new Error(errorMessage);
-                            }
-                            
-                            // 如果用户是成员但Gas估算失败，可能是已经签到或其他合约限制
-                            errorMessage += 'Gas估算失败，可能原因：1) 今日已签到 2) 网络异常 3) 合约暂时不可用。详细错误: ' + estimateError.message;
-                            
-                        } catch (checkError) {
-                            // 如果是我们抛出的错误，直接传递
-                            if (checkError.message.startsWith('签到失败：')) {
-                                throw checkError;
-                            }
-                            // 如果检查过程中出错，可能是网络问题
-                            errorMessage += '无法验证签到条件，请检查网络连接。';
-                        }
-                        
-                        // 使用默认Gas值作为降级处理
-                         console.warn('Gas估算失败，使用默认Gas值:', errorMessage);
-                         gasEstimate = 200000; // 默认Gas值
-                         UIManager.showStatus('正在使用默认Gas设置重试签到...', 'info');
-                    }
-                    
-                    // 调用签到合约方法，使用估算的Gas + 20%缓冲
-                    const gasLimit = Math.floor(gasEstimate * 1.2);
-                    console.log('使用Gas限制:', gasLimit);
-                    
-                    const result = await AppState.contracts.jvcore.methods.checkIn(userTokenId).send({
-                        from: AppState.userAccount,
+
+                    const userTokenId = await contract.methods.tokenOfOwnerByIndex(signingAccount, 0).call();
+                    if (!isCurrent()) throw new Error('钱包会话已变化，已停止本次签到');
+
+                    UIManager.showStatus('正在估算交易费用...', 'info');
+                    const gasEstimate = await contract.methods.checkIn(userTokenId).estimateGas({
+                        from: signingAccount
+                    });
+                    const gasLimit = JVWallet.calculateGasLimit(gasEstimate);
+                    await JVWallet.assertSession(signingProvider, CONFIG.network, signingAccount);
+                    if (!isCurrent()) throw new Error('钱包账户或网络已变化，已阻止发送交易');
+
+                    UIManager.showStatus('请在钱包中确认签到交易...', 'info');
+                    const receipt = await contract.methods.checkIn(userTokenId).send({
+                        from: signingAccount,
                         gas: gasLimit
                     });
-                    
-                    UIManager.showStatus('签到成功！🎉', 'success');
-                    console.log('签到交易:', result);
-                    
-                    // 签到成功动画效果
+                    if (!isCurrent()) {
+                        UIManager.showStatus('交易已返回，但钱包会话已变化；请通过交易哈希核查链上结果', 'warning');
+                        return;
+                    }
+                    const successful = receipt && (
+                        receipt.status === true || receipt.status === 1
+                        || receipt.status === '0x1' || receipt.status === 1n
+                    );
+                    if (!successful) throw new Error('链上交易未成功，请核查交易回执');
+                    if (!receipt.transactionHash) throw new Error('交易回执缺少交易哈希，无法完成结果核验');
+                    const checkInTopic = Web3.utils.sha3('CheckIn(uint256,uint256,uint256)');
+                    const decodedEvent = receipt.events && receipt.events.CheckIn;
+                    const decodedEvents = Array.isArray(decodedEvent) ? decodedEvent : (decodedEvent ? [decodedEvent] : []);
+                    const expectedTokenId = BigInt(userTokenId).toString();
+                    const decodedEventFromContract = decodedEvents.some((event) =>
+                        event.address && event.address.toLowerCase() === CONFIG.contracts.jvcore.toLowerCase()
+                        && event.returnValues && event.returnValues.tokenId !== undefined
+                        && BigInt(event.returnValues.tokenId).toString() === expectedTokenId
+                    );
+                    const rawEvent = Array.isArray(receipt.logs) && receipt.logs.some((log) =>
+                        log.address && log.address.toLowerCase() === CONFIG.contracts.jvcore.toLowerCase()
+                        && Array.isArray(log.topics) && log.topics[0] === checkInTopic
+                        && log.topics[1] && BigInt(log.topics[1]).toString() === expectedTokenId
+                    );
+                    if (!decodedEventFromContract && !rawEvent) {
+                        throw new Error('交易已成功上链，但未找到本合约的 CheckIn 签到事件；暂不显示签到成功，请核查交易');
+                    }
+
+                    UIManager.showStatus('签到成功！链上签到事件已验证：' + receipt.transactionHash, 'success');
+                    console.log('签到交易回执:', receipt);
                     checkinBtn.style.animation = 'pulse 0.5s ease-in-out';
-                    
-                    // 签到成功后延迟刷新成员信息
                     setTimeout(() => {
-                        MemberManager.checkMembership();
+                        if (isCurrent()) MemberManager.checkMembership();
                     }, 2000);
-                    
                 } catch (error) {
+                    if (!isCurrent()) return;
                     console.error('签到失败:', error);
-                    
-                    // 处理不同类型的错误
-                    if (error.message.includes('User denied')) {
+                    const message = error && error.message ? error.message : String(error);
+                    if (message.includes('User denied') || (error && error.code === 4001)) {
                         UIManager.showStatus('用户取消了交易', 'error');
-                    } else if (error.message.startsWith('签到失败：')) {
-                        // 这是我们在Gas估算阶段抛出的详细错误
-                        UIManager.showStatus(error.message, 'error');
-                    } else if (error.message.includes('reverted')) {
-                        // 交易被回滚的详细错误处理
-                        console.error('交易回滚详情:', {
-                            message: error.message,
-                            receipt: error.receipt,
-                            reason: error.reason
-                        });
-                        
-                        let errorMsg = '签到失败：交易被区块链网络拒绝。';
-                        
-                        // 检查常见的回滚原因
-                        if (error.message.includes('insufficient funds')) {
-                            errorMsg += ' 原因：余额不足，请确保账户有足够的J代币支付Gas费用。💡 解决方案：请向账户充值J代币。';
-                        } else if (error.message.includes('Check-in too soon')) {
-                            errorMsg = '签到失败：距离上次签到时间不足24小时，请等待足够时间后再次签到。💡 解决方案：每次签到间隔需要大于86400秒（24小时）。';
-                        } else if (error.message.includes('already checked in')) {
-                            errorMsg += ' 原因：今日已签到，请明天再来。💡 解决方案：每日只能签到一次，请等待明天。';
-                        } else if (error.message.includes('not a member')) {
-                            errorMsg += ' 原因：您不是JVCore成员，请先获取JVCore NFT。💡 解决方案：请访问官方渠道获取JVCore NFT。';
-                        } else {
-                            errorMsg += ' 💡 请检查：1) 网络连接是否正常 2) 是否为JVCore成员 3) 账户余额是否充足 4) 今日是否已签到';
-                        }
-                        
-                        UIManager.showStatus(errorMsg, 'error');
-                    } else if (error.message.includes('network')) {
-                        UIManager.showStatus('网络错误：请检查网络连接或切换到JNS DAO网络。💡 解决方案：请确保连接到正确的网络。', 'error');
-                    } else if (error.code === 32000) {
-                        UIManager.showStatus('签到条件不满足：请确保您是JVCore成员且今日未签到。💡 解决方案：检查成员状态和签到记录。', 'error');
+                    } else if (message.startsWith('签到失败：')) {
+                        UIManager.showStatus(message, 'error');
+                    } else if (message.includes('revert')) {
+                        UIManager.showStatus('签到失败：交易被合约拒绝。请检查成员资格、签到间隔和账户余额。', 'error');
+                    } else if (message.toLowerCase().includes('network')) {
+                        UIManager.showStatus('网络错误：请检查网络连接或切换到JNS DAO网络。', 'error');
                     } else {
-                        UIManager.showStatus('签到失败: ' + error.message + ' 💡 解决方案：请刷新页面重试或联系技术支持。', 'error');
+                        UIManager.showStatus('签到失败：' + message, 'error');
                     }
                 } finally {
-                    // 恢复按钮状态
-                    checkinBtn.classList.remove('loading');
-                    // 根据签到状态恢复正确的按钮文案
-                    if (window.hasCheckedInThisMonth) {
-                        checkinBtn.textContent = '🎯 再次签到';
+                    this.busy = false;
+                    if (isCurrent()) {
+                        checkinBtn.classList.remove('loading');
+                        checkinBtn.textContent = window.hasCheckedInThisMonth ? '🎯 再次签到' : '🎯 立即签到';
+                        checkinBtn.disabled = false;
+                        setTimeout(() => { checkinBtn.style.animation = ''; }, 500);
                     } else {
-                        checkinBtn.textContent = '🎯 立即签到';
+                        checkinBtn.classList.remove('loading');
+                        checkinBtn.disabled = false;
                     }
-                    checkinBtn.disabled = false;
-                    
-                    // 重置动画
-                    setTimeout(() => {
-                        checkinBtn.style.animation = '';
-                    }, 500);
                 }
             }
         };
@@ -1638,82 +1586,80 @@
          * 监听MetaMask事件
          * 处理账户切换和网络变化
          */
-        if (typeof window.ethereum !== 'undefined') {
-            // 监听账户变化事件
-            window.ethereum.on('accountsChanged', function (accounts) {
-                if (accounts.length === 0) {
-                    // 用户断开了所有账户
-                    disconnectWallet();
-                } else if (accounts[0] !== AppState.userAccount) {
-                    // 用户切换了账户
-                    AppState.userAccount = accounts[0];
-                    document.getElementById('walletAddress').textContent = `钱包地址: ${AppState.userAccount}`;
-                    
-                    // 清除旧账户的状态信息
-                    UIManager.clearMemberInfo();
-                    
-                    // 重新检查新账户的成员状态
-                    MemberManager.checkMembership();
-                }
-            });
-            
-            // 监听网络变化事件
-            let chainChangeTimeout;
-            window.ethereum.on('chainChanged', function (chainId) {
-                console.log('网络变化检测到:', chainId);
-                
-                // 清除之前的定时器，防止频繁触发
-                if (chainChangeTimeout) {
-                    clearTimeout(chainChangeTimeout);
-                }
-                
-                // 添加防抖机制，延迟处理网络变化
-                chainChangeTimeout = setTimeout(async () => {
-                    try {
-                        // 检查是否在欧易客户端中
-                        const isOKXApp = /OKApp/i.test(navigator.userAgent) || window.okxwallet;
-                        
-                        if (isOKXApp) {
-                            // 在欧易客户端中，不重新加载页面，而是重新初始化合约
-                            console.log('检测到欧易客户端，重新初始化合约而非重载页面');
-                            UIManager.showStatus('网络已切换，正在重新连接...', 'info');
-                            
-                            // 清除当前状态
-                            AppState.contracts = {};
-                            UIManager.clearMemberInfo();
-                            
-                            // 重新初始化合约
-                            if (AppState.userAccount) {
-                                await ContractManager.initialize();
-                                await MemberManager.checkMembership();
-                                UIManager.showStatus('网络切换完成', 'success');
-                            }
-                        } else {
-                            // 在其他环境中，检查网络是否正确
-                            const currentChainId = await window.ethereum.request({ method: 'eth_chainId' });
-                            const targetChainId = CONFIG.network.chainId; // 使用配置中的链ID
-                            
-                            if (currentChainId !== targetChainId) {
-                                // 只有在网络不匹配时才提示切换
-                                UIManager.showStatus('请切换到JNS DAO网络', 'error');
-                            } else {
-                                // 网络正确，重新初始化合约
-                                if (AppState.userAccount) {
-                                    await ContractManager.initialize();
-                                    await MemberManager.checkMembership();
-                                }
-                            }
-                        }
-                    } catch (error) {
-                        console.error('处理网络变化失败:', error);
-                        UIManager.showStatus('网络切换处理失败: ' + error.message, 'error');
-                    }
-                }, 1000); // 1秒防抖延迟
-            });
+        let boundProvider = null;
+        let lastAccount = null;
+        async function onAccountsChanged(accounts) {
+            const nextAccount = accounts && accounts.length ? String(accounts[0]).toLowerCase() : null;
+            if (nextAccount === lastAccount) return;
+            lastAccount = nextAccount;
+            walletSessionEpoch++;
+            AppState.reset();
+            const connectBtn = document.getElementById('connectBtn');
+            connectBtn.classList.remove('loading');
+            connectBtn.textContent = '连接钱包';
+            connectBtn.disabled = false;
+            UIManager.updateWalletUI(false);
+            UIManager.clearMemberInfo();
+            if (!accounts || !accounts.length) {
+                UIManager.showStatus('钱包已断开连接', 'info');
+            } else {
+                UIManager.showStatus('钱包账户已变化，请重新连接后继续', 'info');
+            }
         }
-        
+        async function onChainChanged(chainId) {
+            if (!JVWallet.sameChain(chainId, CONFIG.network.chainId)) {
+                walletSessionEpoch++;
+                AppState.reset();
+                const connectBtn = document.getElementById('connectBtn');
+                connectBtn.classList.remove('loading');
+                connectBtn.textContent = '连接钱包';
+                connectBtn.disabled = false;
+                UIManager.updateWalletUI(false);
+                UIManager.clearMemberInfo();
+                UIManager.showStatus('网络已切换，请连接焦耳链后重试', 'error');
+                return;
+            }
+            const provider = AppState.provider;
+            const account = AppState.userAccount;
+            if (!provider || !account) return;
+            const epoch = walletSessionEpoch;
+            AppState.contracts = { jvcore: null };
+            UIManager.clearMemberInfo();
+            try {
+                await JVWallet.assertSession(provider, CONFIG.network, account);
+                if (epoch !== walletSessionEpoch || AppState.provider !== provider || AppState.userAccount !== account) return;
+                ContractManager.initialize();
+                await MemberManager.checkMembership();
+            } catch (error) {
+                if (epoch === walletSessionEpoch) {
+                    walletSessionEpoch++;
+                    AppState.reset();
+                    const connectBtn = document.getElementById('connectBtn');
+                    connectBtn.classList.remove('loading');
+                    connectBtn.textContent = '连接钱包';
+                    connectBtn.disabled = false;
+                    UIManager.updateWalletUI(false);
+                    UIManager.clearMemberInfo();
+                    UIManager.showStatus(error.message, 'error');
+                }
+            }
+        }
+        function bindWalletEvents(provider) {
+            if (boundProvider === provider) return;
+            if (boundProvider && typeof boundProvider.removeListener === 'function') {
+                boundProvider.removeListener('accountsChanged', onAccountsChanged);
+                boundProvider.removeListener('chainChanged', onChainChanged);
+            } else if (boundProvider && typeof boundProvider.off === 'function') {
+                boundProvider.off('accountsChanged', onAccountsChanged);
+                boundProvider.off('chainChanged', onChainChanged);
+            }
+            boundProvider = provider;
+            if (provider && typeof provider.on === 'function') {
+                provider.on('accountsChanged', onAccountsChanged);
+                provider.on('chainChanged', onChainChanged);
+            }
+        }
 
-        
         // 页面初始化代码已移动到 initializeMainApp 函数中
         
         
@@ -1727,7 +1673,7 @@
                 createDataStreams();
                 
                 // 检查是否已经连接钱包，如果是则自动连接
-                if (typeof window.ethereum !== 'undefined' && window.ethereum.selectedAddress) {
+                if (JVWallet.getProvider(window) && JVWallet.getProvider(window).selectedAddress) {
                     await connectWallet();
                 }
             });
